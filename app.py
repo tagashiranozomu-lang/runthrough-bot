@@ -6,7 +6,7 @@ from google.genai import types
 from streamlit_mic_recorder import mic_recorder
 
 API_KEY = "AIzaSyDa2ahdCEbKZREevcIQM_MKMuq4aPPMCDo"
-GAS_SEARCH_URL = "https://script.google.com/a/macros/cyberace.co.jp/s/AKfycbxZbxF8be6p1FHVjVTjw1PWlrvHpzBm08ebb2djHN0kMxt0zj1zzb1EsPAGDgdtvQ9i7Q/exec"
+GAS_SEARCH_URL = "https://script.google.com/macros/s/AKfycbwamDpiWCntQ2DMrg8uI7vvTby4LCMfsbbmrsQzvAvKY0kxhOZzAZQJ-KftIg2jRsTS/exec"
 client = genai.Client(api_key=API_KEY)
 
 PERSONA_BASE = """あなたは営業の練習相手です。以下のルールを守ってください。
