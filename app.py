@@ -53,6 +53,7 @@ def get_bot_reply(user_text):
             system_instruction=PERSONA,
             thinking_config=types.ThinkingConfig(thinking_budget=0),
         ),
+    )
     return response.text
 
 def handle_input(user_text):
