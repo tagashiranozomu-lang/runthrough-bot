@@ -35,12 +35,36 @@ mode = st.sidebar.radio(
     ["③ 最厳決裁者モード", "① 対人攻略モード", "② 新規提案練習モード"]
 )
 
+DRIVE_API_KEY = "AIzaSyC42lIZZ8xVRkAa9uZl1G5a9Ivm2NmWOhE"
+FOLDER_ID = "13xakiRXNdD9XdQxzyTanGFhC8PU3dZSf"
+
 def fetch_logs(query, search_mode):
     try:
-        res = requests.get(GAS_SEARCH_URL, params={"query": query, "mode": search_mode}, timeout=30)
-        data = res.json()
-        if data.get("success") and data.get("files"):
-            return data["files"]
+        if search_mode == "person":
+            q = f"name contains '{query}' and '{FOLDER_ID}' in parents and mimeType != 'application/vnd.google-apps.folder'"
+        else:
+            q = f"fullText contains '{query}' and '{FOLDER_ID}' in parents and mimeType != 'application/vnd.google-apps.folder'"
+
+        list_url = "https://www.googleapis.com/drive/v3/files"
+        params = {
+            "q": q,
+            "key": DRIVE_API_KEY,
+            "pageSize": 5,
+            "fields": "files(id,name)",
+            "supportsAllDrives": True,
+            "includeItemsFromAllDrives": True,
+        }
+        res = requests.get(list_url, params=params, timeout=30)
+        files_data = res.json().get("files", [])
+
+        results = []
+        for f in files_data:
+            content_url = f"https://www.googleapis.com/drive/v3/files/{f['id']}?alt=media&key={DRIVE_API_KEY}"
+            content_res = requests.get(content_url, timeout=30)
+            if content_res.status_code == 200:
+                results.append({"filename": f["name"], "content": content_res.text[:6000]})
+
+        return results
     except Exception as e:
         st.error(f"ログ取得エラー: {e}")
     return []
