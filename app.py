@@ -58,7 +58,7 @@ def fetch_logs(query, search_mode):
     return []
 
 def build_persona_from_logs(logs, query, mode):
-    combined = "\n\n".join([f"=== {f['filename']} ===\n{f['content']}" for f in logs])
+    combined = "\n\n".join([f"=== {f['filename']} ===\n{f['content'][:1500]}" for f in logs[:3]])
     if mode == "person":
         prompt = f"""以下の商談ログから「{query}」の担当者プロファイルを作成してください。
 
