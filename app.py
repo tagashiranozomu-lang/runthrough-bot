@@ -29,8 +29,8 @@ PERSONA_STRICT = """あなたは「最も厳しい決裁者」として振る舞
 - プレゼンが終わったら「総評」として良かった点1つ・改善点3つを出す
 - 日本語で話す"""
 
-st.set_page_config(page_title="ランスルーBot", page_icon="🎯")
-st.title("🎯 ランスルーBot")
+st.set_page_config(page_title="アポDRILL", page_icon="🎯")
+st.title("🎯 アポDRILL")
 
 mode = st.sidebar.radio(
     "モードを選択",
