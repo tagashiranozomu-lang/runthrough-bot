@@ -1,13 +1,15 @@
 import streamlit as st
 import base64
 import requests
+import json
 from google import genai
 from google.genai import types
 from streamlit_mic_recorder import mic_recorder
 
 API_KEY = st.secrets["GEMINI_API_KEY"]
-GAS_SEARCH_URL = "https://script.google.com/macros/s/AKfycbwamDpiWCntQ2DMrg8uI7vvTby4LCMfsbbmrsQzvAvKY0kxhOZzAZQJ-KftIg2jRsTS/exec"
 client = genai.Client(api_key=API_KEY)
+
+GITHUB_RAW_URL = "https://raw.githubusercontent.com/tagashiranozomu-lang/runthrough-bot/main/logs_index.json"
 
 PERSONA_BASE = """あなたは営業の練習相手です。以下のルールを守ってください。
 - 相手の説明が不十分なら「もっと具体的に」「数字は？」と短く返す
@@ -32,15 +34,8 @@ st.title("🎯 ランスルーBot")
 
 mode = st.sidebar.radio(
     "モードを選択",
-    ["③ 最厳決裁者モード", "① 対人攻略モード", "② 新規提案練習モード"]
+    ["④ アポ設計モード", "① 対人攻略モード", "② 新規提案練習モード"]
 )
-
-GITHUB_RAW_URL = "https://raw.githubusercontent.com/tagashiranozomu-lang/runthrough-bot/main/logs_index.json"
-
-@st.cache_data(ttl=3600)
-def load_logs_index():
-    res = requests.get(GITHUB_RAW_URL, timeout=60)
-    return res.json()
 
 KEYWORD_EXPAND = {
     "人材": ["人材", "採用", "求人", "HR", "人事", "リクルート", "転職"],
@@ -63,6 +58,12 @@ def expand_keywords(query):
             keywords.extend(synonyms)
     return list(set(keywords))
 
+@st.cache_data(ttl=3600)
+def load_logs_index():
+    res = requests.get(GITHUB_RAW_URL, timeout=60)
+    res.encoding = "utf-8"
+    return json.loads(res.text)
+
 def fetch_logs(query, search_mode):
     try:
         all_logs = load_logs_index()
@@ -79,6 +80,16 @@ def fetch_logs(query, search_mode):
         st.error(f"ログ取得エラー: {e}")
     return []
 
+def call_gemini(prompt):
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            thinking_config=types.ThinkingConfig(thinking_budget=0)
+        ),
+    )
+    return response.text
+
 def build_persona_from_logs(logs, query, mode):
     combined = "\n\n".join([f"=== {f['filename']} ===\n{f['content'][:1500]}" for f in logs[:3]])
     if mode == "person":
@@ -94,11 +105,11 @@ def build_persona_from_logs(logs, query, mode):
 - **意思決定スタイル**:
 - **NGワード・避けるべき話し方**:
 
-## このペルソナとして練習する際の注意点
+## 練習時の注意点
 -
 """
     else:
-        prompt = f"""以下の商談ログから「{query}」業界の新規提案でよく出る厳しい質問・反論パターンを分析してください。
+        prompt = f"""以下の商談ログから「{query}」業界の新規提案でよく出る質問・反論パターンを分析してください。
 
 ## ログ
 {combined}
@@ -110,20 +121,64 @@ def build_persona_from_logs(logs, query, mode):
 4.
 5.
 
-## この業界特有の地雷・注意点
--
-
-## このデータをもとに練習する際の心構え
+## この業界特有の注意点
 -
 """
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            thinking_config=types.ThinkingConfig(thinking_budget=0)
-        ),
-    )
-    return response.text
+    return call_gemini(prompt)
+
+def generate_apo_design(purpose, query, logs):
+    combined = "\n\n".join([f"=== {f['filename']} ===\n{f['content'][:1500]}" for f in logs[:3]])
+    prompt = f"""あなたは営業戦略のエキスパートです。
+以下の情報をもとに、アポ設計シートを作成してください。
+
+## アポの目的
+{purpose}
+
+## 顧客・業界情報（キーワード）
+{query}
+
+## 過去の類似商談ログ
+{combined}
+
+## 出力形式（必ずこの形式で）
+
+### 🎯 道筋シナリオ
+**パターンA：**（アプローチ名）
+- 流れ：
+- 有効な場面：
+
+**パターンB：**（アプローチ名）
+- 流れ：
+- 有効な場面：
+
+**パターンC：**（アプローチ名）
+- 流れ：
+- 有効な場面：
+
+### ⚡ 想定される突っ込みパターン
+① 突っ込み内容：
+　→ 返し方のヒント：
+
+② 突っ込み内容：
+　→ 返し方のヒント：
+
+③ 突っ込み内容：
+　→ 返し方のヒント：
+
+④ 突っ込み内容：
+　→ 返し方のヒント：
+
+⑤ 突っ込み内容：
+　→ 返し方のヒント：
+
+### ✅ 準備チェックリスト
+- [ ] 
+- [ ] 
+- [ ] 
+- [ ] 
+- [ ] 
+"""
+    return call_gemini(prompt)
 
 def get_bot_reply(user_text, persona, history):
     contents = []
@@ -148,12 +203,12 @@ def handle_input(user_text, persona):
     with st.chat_message("assistant"):
         with st.spinner("考えています..."):
             reply = get_bot_reply(user_text, persona, st.session_state.history[:-1])
-        st.write(f"【決裁者】　{reply}")
+        st.write(f"【相手】　{reply}")
     st.session_state.history.append({"role": "assistant", "content": reply})
 
 def show_chat_ui(persona):
     for msg in st.session_state.history:
-        label = "【決裁者】" if msg["role"] == "assistant" else "【あなた】"
+        label = "【相手】" if msg["role"] == "assistant" else "【あなた】"
         with st.chat_message(msg["role"]):
             st.write(f"{label}　{msg['content']}")
 
@@ -162,18 +217,14 @@ def show_chat_ui(persona):
     if audio:
         audio_b64 = base64.b64encode(audio["bytes"]).decode()
         with st.spinner("音声認識中..."):
-            tr = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=[{"role": "user", "parts": [
+            transcript = call_gemini([{
+                "role": "user",
+                "parts": [
                     {"inline_data": {"mime_type": "audio/wav", "data": audio_b64}},
                     {"text": "この音声を文字起こしして、結果のみ返してください。"}
-                ]}],
-                config=types.GenerateContentConfig(
-                    thinking_config=types.ThinkingConfig(thinking_budget=0)
-                ),
-            )
-            transcript = tr.text.strip()
-        handle_input(transcript, persona)
+                ]
+            }])
+        handle_input(transcript.strip(), persona)
         st.rerun()
 
     user_input = st.chat_input("テキストで入力...")
@@ -183,12 +234,40 @@ def show_chat_ui(persona):
 
 # ========== モード別UI ==========
 
-if mode == "③ 最厳決裁者モード":
-    st.caption("汎用の最厳決裁者と練習します")
-    if "history" not in st.session_state or st.session_state.get("last_mode") != mode:
-        st.session_state.history = [{"role": "assistant", "content": "では始めてください。何の提案ですか？"}]
+if mode == "④ アポ設計モード":
+    st.caption("アポ前の準備シートを自動生成します")
+
+    purpose = st.text_area(
+        "このアポで達成したい目的を入力",
+        placeholder="例：初回商談でニーズを引き出し、次回の提案機会を獲得したい",
+        height=100
+    )
+    query = st.text_input(
+        "顧客名または業界キーワード",
+        placeholder="例：タイミー、教育業界、SaaS"
+    )
+
+    if purpose and query and st.button("アポ設計シートを生成"):
+        with st.spinner(f"「{query}」の過去ログを検索中..."):
+            logs = fetch_logs(query, "industry")
+        log_count = len(logs)
+        if log_count > 0:
+            st.success(f"{log_count}件の関連ログをもとに生成します")
+        else:
+            st.info("関連ログは見つかりませんでしたが、一般的な知識で生成します")
+
+        with st.spinner("アポ設計シートを生成中..."):
+            sheet = generate_apo_design(purpose, query, logs)
+
+        st.session_state.apo_sheet = sheet
+        st.session_state.apo_query = query
         st.session_state.last_mode = mode
-    show_chat_ui(PERSONA_STRICT)
+
+    if "apo_sheet" in st.session_state and st.session_state.get("last_mode") == mode:
+        st.markdown("---")
+        st.markdown(st.session_state.apo_sheet)
+        st.markdown("---")
+        st.info("👇 この設計をもとに練習するには、左のメニューから①または②を選んでください")
 
 elif mode == "① 対人攻略モード":
     st.caption("特定の担当者のペルソナで練習します")
