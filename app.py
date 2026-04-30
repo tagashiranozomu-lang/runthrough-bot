@@ -42,17 +42,39 @@ def load_logs_index():
     res = requests.get(GITHUB_RAW_URL, timeout=60)
     return res.json()
 
+KEYWORD_EXPAND = {
+    "人材": ["人材", "採用", "求人", "HR", "人事", "リクルート", "転職"],
+    "教育": ["教育", "研修", "学習", "eラーニング", "スクール", "トレーニング"],
+    "SaaS": ["SaaS", "クラウド", "システム", "ツール", "プラットフォーム"],
+    "製造": ["製造", "メーカー", "工場", "生産", "品質管理"],
+    "不動産": ["不動産", "建設", "住宅", "マンション", "土地"],
+    "医療": ["医療", "病院", "クリニック", "ヘルスケア", "製薬"],
+    "金融": ["金融", "銀行", "保険", "証券", "投資", "FinTech"],
+    "小売": ["小売", "EC", "通販", "流通", "店舗"],
+    "飲食": ["飲食", "レストラン", "フード", "外食"],
+    "IT": ["IT", "システム", "エンジニア", "開発", "DX", "デジタル"],
+}
+
+def expand_keywords(query):
+    keywords = [query]
+    query_lower = query.lower()
+    for key, synonyms in KEYWORD_EXPAND.items():
+        if any(s.lower() in query_lower or query_lower in s.lower() for s in synonyms):
+            keywords.extend(synonyms)
+    return list(set(keywords))
+
 def fetch_logs(query, search_mode):
     try:
         all_logs = load_logs_index()
-        query_lower = query.lower()
-        results = []
+        keywords = expand_keywords(query)
+        scored = []
         for log in all_logs:
-            if query_lower in log["filename"].lower() or query_lower in log["content"].lower():
-                results.append({"filename": log["filename"], "content": log["content"]})
-            if len(results) >= 5:
-                break
-        return results
+            text = (log["filename"] + " " + log["content"]).lower()
+            score = sum(1 for kw in keywords if kw.lower() in text)
+            if score > 0:
+                scored.append((score, log))
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [log for _, log in scored[:5]]
     except Exception as e:
         st.error(f"ログ取得エラー: {e}")
     return []
