@@ -34,7 +34,7 @@ st.title("🎯 ランスルーBot")
 
 mode = st.sidebar.radio(
     "モードを選択",
-    ["④ アポ設計モード", "① 対人攻略モード", "② 新規提案練習モード"]
+    ["① アポ設計モード", "② 対人攻略モード", "③ 新規提案練習モード"]
 )
 
 KEYWORD_EXPAND = {
@@ -234,7 +234,7 @@ def show_chat_ui(persona):
 
 # ========== モード別UI ==========
 
-if mode == "④ アポ設計モード":
+if mode == "① アポ設計モード":
     st.caption("アポ前の準備シートを自動生成します")
 
     purpose = st.text_area(
@@ -269,7 +269,7 @@ if mode == "④ アポ設計モード":
         st.markdown("---")
         st.info("👇 この設計をもとに練習するには、左のメニューから①または②を選んでください")
 
-elif mode == "① 対人攻略モード":
+elif mode == "② 対人攻略モード":
     st.caption("特定の担当者のペルソナで練習します")
     query = st.text_input("担当者名または会社名を入力", placeholder="例：タイミー、田中様")
 
@@ -292,7 +292,7 @@ elif mode == "① 対人攻略モード":
             st.markdown(st.session_state.karte)
         show_chat_ui(st.session_state.logs_persona)
 
-elif mode == "② 新規提案練習モード":
+elif mode == "③ 新規提案練習モード":
     st.caption("類似業界のログをもとに厳しい質問で練習します")
     query = st.text_input("業界キーワードを入力", placeholder="例：教育、人材、SaaS、製造")
 
