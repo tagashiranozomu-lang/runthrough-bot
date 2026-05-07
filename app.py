@@ -2,6 +2,7 @@ import streamlit as st
 import base64
 import requests
 import json
+import re
 from google import genai
 from google.genai import types
 from streamlit_mic_recorder import mic_recorder
@@ -10,6 +11,20 @@ API_KEY = st.secrets["GEMINI_API_KEY"]
 client = genai.Client(api_key=API_KEY)
 
 GITHUB_RAW_URL = "https://raw.githubusercontent.com/tagashiranozomu-lang/runthrough-bot/main/logs_index.json"
+
+APO_PURPOSES = [
+    "初回商談でニーズを引き出す",
+    "次回提案の機会を獲得する",
+    "本提案・クロージングを行う",
+    "既存顧客の継続・更新を確保する",
+    "アップセル・クロスセルを提案する",
+    "失注後の関係を再構築する",
+    "競合からの乗り換えを提案する",
+    "予算・稟議承認を獲得する",
+    "導入後の課題をヒアリングし改善提案する",
+    "新たなキーパーソンと関係を構築する",
+    "その他（自由記述）",
+]
 
 PERSONA_BASE = """あなたは営業の練習相手です。以下のルールを守ってください。
 - 相手の説明が不十分なら「もっと具体的に」「数字は？」と短く返す
@@ -29,13 +44,33 @@ PERSONA_STRICT = """あなたは「最も厳しい決裁者」として振る舞
 - プレゼンが終わったら「総評」として良かった点1つ・改善点3つを出す
 - 日本語で話す"""
 
-st.set_page_config(page_title="アポDRILL", page_icon="🎯")
-st.title("🎯 アポDRILL")
+CUSTOMER_TYPES_16 = """
+【顧客16タイプ一覧】
 
-mode = st.sidebar.radio(
-    "モードを選択",
-    ["① アポ設計モード", "② 対人攻略モード", "③ 新規提案練習モード"]
-)
+＜主導型グループ＞
+タイプ1「成果主導型」：数字・結果にフォーカス。ROI・KPIで判断する。「で、結果は？」が口癖。
+タイプ2「革新主導型」：新しいことに積極的。トレンドや先進事例に強く興味を持つ。
+タイプ3「競争主導型」：競合他社との差別化を強く意識する。「他社と何が違う？」が口癖。
+タイプ4「権威主導型」：自分の経験・判断を最重視。上から目線になりやすく、従来のやり方を変えたがらない。
+
+＜感化型グループ＞
+タイプ5「熱狂型」：ビジョン・熱量で動く。感情的に共鳴すると一気に動く。
+タイプ6「共感型」：相手の話をよく聞く。人間関係・信頼を大切にする。
+タイプ7「影響力型」：社内評判・他者の目を気にする。実績・推薦事例に弱い。
+タイプ8「楽観型」：リスクより可能性に目を向ける。細かい話より夢の話が好き。
+
+＜安定型グループ＞
+タイプ9「協調型」：チーム・社内合意を重視。一人では決めない。「上に相談します」が口癖。
+タイプ10「信頼重視型」：長期的な関係・信頼を最優先にする。人で買う。
+タイプ11「保守型」：現状維持志向。変化・リスクを極端に嫌う。「今のままでいい」が口癖。
+タイプ12「サポート型」：自分より他者・チームを優先。縁の下の力持ち。意思決定より実務を好む。
+
+＜分析型グループ＞
+タイプ13「完璧主義型」：細部・正確性にこだわる。資料の粗が気になる。「この数字の根拠は？」が口癖。
+タイプ14「懐疑型」：疑問・検証を繰り返す。「本当に？」「証拠は？」が口癖。
+タイプ15「戦略型」：長期的視点・全体像で判断。部分最適より全体最適を重視。
+タイプ16「専門家型」：業界知識・専門性を重視。浅い話を嫌う。用語・深度で信頼度を測る。
+"""
 
 KEYWORD_EXPAND = {
     "人材": ["人材", "採用", "求人", "HR", "人事", "リクルート", "転職"],
@@ -79,6 +114,22 @@ def fetch_logs(query, search_mode):
     except Exception as e:
         st.error(f"ログ取得エラー: {e}")
     return []
+
+def extract_persons_from_company(company_query):
+    try:
+        all_logs = load_logs_index()
+        keywords = expand_keywords(company_query)
+        persons = set()
+        for log in all_logs:
+            if any(kw.lower() in log["filename"].lower() for kw in keywords):
+                matches = re.findall(r'\d+:\d+\s+([^\n]{2,20})', log["content"])
+                for name in matches[:30]:
+                    name = name.strip()
+                    if name and not name[0].isdigit() and 2 <= len(name) <= 20:
+                        persons.add(name)
+        return sorted(list(persons))
+    except:
+        return []
 
 def call_gemini(prompt):
     response = client.models.generate_content(
@@ -126,48 +177,38 @@ def build_persona_from_logs(logs, query, mode):
 """
     return call_gemini(prompt)
 
-CUSTOMER_TYPES = """
-【顧客タイプ一覧】
-タイプ1「数値重視型」：ROI・具体的な数字・実績データを強く求める。感情より論理で動く。「それで結果は？」「数字で見せて」が口癖。
-タイプ2「リスク回避型」：失敗・変化を恐れる。導入実績・保証・サポート体制を重視する。「他社での失敗事例は？」「もし上手くいかなかったら？」が口癖。
-タイプ3「関係構築型」：担当者との信頼関係・人間性を最優先にする。感情で動く。「あなたを信頼しているから」が決め手になる。
-タイプ4「スピード重視型」：即断即決を好む。結論から話すことを求める。回りくどい説明を嫌う。「で、要するに何が言いたいの？」が口癖。
-タイプ5「慎重検討型」：社内稟議・合議を重視。独断では決めない。決定まで時間がかかる。「一度持ち帰って検討します」が口癖。
-"""
-
 def generate_apo_design(purpose, query, logs):
     combined = "\n\n".join([f"=== {f['filename']} ===\n{f['content'][:1500]}" for f in logs[:5]])
     logs_section = combined if combined else "（関連ログなし：一般的な知識で判断）"
-
     prompt = f"""あなたは営業戦略のエキスパートです。
 以下の情報をもとに、アポ設計シートを作成してください。
 
 ## アポの目的
 {purpose}
 
-## 顧客・業界情報
+## 顧客・担当者情報
 {query}
 
 ## 過去の類似商談ログ
 {logs_section}
 
-{CUSTOMER_TYPES}
+{CUSTOMER_TYPES_16}
 
 ## 出力形式（必ずこの形式・この順番で）
 
 ### 👥 顧客タイプ分析
-過去ログと顧客情報をもとに、上記5タイプの中から最も該当するタイプを1〜2個判定してください。
+過去ログと顧客情報をもとに、上記16タイプの中から最も該当するタイプを判定してください。
 
-**判定結果：タイプ〇「〇〇型」**（可能性：高/中）
+**メインタイプ：タイプ〇「〇〇型」**
 判定理由：（ログや業界特性から読み取れる根拠を2〜3文で）
 
-**サブタイプ：タイプ〇「〇〇型」**（可能性：中）※該当する場合のみ
+**サブタイプ：タイプ〇「〇〇型」**（該当する場合のみ）
 理由：
 
 ---
 
 ### 🎯 道筋シナリオ
-上記タイプを踏まえた3つのアプローチパターン
+判定タイプを踏まえた3つのアプローチパターン
 
 **パターンA：**（アプローチ名）
 - 流れ：
@@ -184,7 +225,6 @@ def generate_apo_design(purpose, query, logs):
 ---
 
 ### ⚡ 想定される突っ込みパターン
-このタイプ・業界で特によく出る質問・反論を5つ
 
 ① 突っ込み内容：
 　→ 返し方のヒント：
@@ -204,7 +244,6 @@ def generate_apo_design(purpose, query, logs):
 ---
 
 ### ✅ 準備チェックリスト
-このタイプ・目的に合わせた準備項目5つ
 
 - [ ] 
 - [ ] 
@@ -266,48 +305,94 @@ def show_chat_ui(persona):
         handle_input(user_input, persona)
         st.rerun()
 
-# ========== モード別UI ==========
+# ========== セットアップ ==========
+
+st.set_page_config(page_title="アポドリル", page_icon="⚡")
+st.title("⚡ アポドリル")
+
+MODES = ["① アポ設計モード", "② 対人攻略モード", "③ 新規提案練習モード"]
+if "mode_index" not in st.session_state:
+    st.session_state.mode_index = 0
+
+mode = st.sidebar.radio("モードを選択", MODES, index=st.session_state.mode_index)
+st.session_state.mode_index = MODES.index(mode)
+
+# ========== ① アポ設計モード ==========
 
 if mode == "① アポ設計モード":
     st.caption("アポ前の準備シートを自動生成します")
 
-    purpose = st.text_area(
-        "このアポで達成したい目的を入力",
-        placeholder="例：初回商談でニーズを引き出し、次回の提案機会を獲得したい",
-        height=100
-    )
-    query = st.text_input(
-        "担当者名、会社名または業界キーワード",
-        placeholder="例：田中様、タイミー、教育業界"
-    )
+    # 目的選択
+    purpose_choice = st.selectbox("このアポで達成したい目的を選択", APO_PURPOSES)
+    if purpose_choice == "その他（自由記述）":
+        purpose = st.text_area("目的を自由記述してください", height=80)
+    else:
+        purpose = purpose_choice
 
-    if purpose and query and st.button("アポ設計シートを生成"):
-        with st.spinner(f"「{query}」の過去ログを検索中..."):
-            logs = fetch_logs(query, "industry")
-        log_count = len(logs)
-        if log_count > 0:
-            st.success(f"{log_count}件の関連ログをもとに生成します")
+    # 会社名入力 → 担当者プルダウン
+    company = st.text_input("会社名を入力", placeholder="例：タイミー、三幸学園")
+
+    person_query = company
+    if company:
+        with st.spinner("担当者を検索中..."):
+            persons = extract_persons_from_company(company)
+
+        if persons:
+            person_options = ["（全員／会社全体で検索）"] + persons
+            selected_person = st.selectbox("先方担当者を選択", person_options)
+            if selected_person != "（全員／会社全体で検索）":
+                person_query = f"{company} {selected_person}"
+        else:
+            st.info("担当者名が見つかりませんでした。会社名で検索します。")
+
+    if purpose and company and st.button("アポ設計シートを生成"):
+        with st.spinner(f"「{person_query}」の過去ログを検索中..."):
+            logs = fetch_logs(person_query, "industry")
+        if logs:
+            st.success(f"{len(logs)}件の関連ログをもとに生成します")
         else:
             st.info("関連ログは見つかりませんでしたが、一般的な知識で生成します")
 
         with st.spinner("アポ設計シートを生成中..."):
-            sheet = generate_apo_design(purpose, query, logs)
+            sheet = generate_apo_design(purpose, person_query, logs)
 
         st.session_state.apo_sheet = sheet
-        st.session_state.apo_query = query
+        st.session_state.apo_query = person_query
+        st.session_state.apo_purpose = purpose
         st.session_state.last_mode = mode
 
     if "apo_sheet" in st.session_state and st.session_state.get("last_mode") == mode:
         st.markdown("---")
         st.markdown(st.session_state.apo_sheet)
         st.markdown("---")
-        st.info("👇 この設計をもとに練習するには、左のメニューから②または③を選んでください")
+        st.markdown("### 🚀 このままロープレに進む")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("② 対人攻略モードで練習する", use_container_width=True):
+                st.session_state.pre_query = st.session_state.apo_query
+                st.session_state.pre_purpose = st.session_state.apo_purpose
+                st.session_state.trigger_mode2 = True
+                st.session_state.mode_index = 1
+                st.rerun()
+        with col2:
+            if st.button("③ 新規提案練習モードで練習する", use_container_width=True):
+                st.session_state.pre_query = st.session_state.apo_query
+                st.session_state.pre_purpose = st.session_state.apo_purpose
+                st.session_state.trigger_mode3 = True
+                st.session_state.mode_index = 2
+                st.rerun()
+
+# ========== ② 対人攻略モード ==========
 
 elif mode == "② 対人攻略モード":
     st.caption("特定の担当者のペルソナで練習します")
-    query = st.text_input("担当者名または会社名を入力", placeholder="例：タイミー、田中様")
 
-    if query and st.button("ログを検索してカルテ生成"):
+    pre_query = st.session_state.pop("pre_query", "") if st.session_state.get("trigger_mode2") else ""
+    trigger = st.session_state.pop("trigger_mode2", False)
+
+    query = st.text_input("担当者名または会社名を入力", value=pre_query, placeholder="例：タイミー、田中様")
+
+    if (trigger and query) or (query and st.button("ログを検索してカルテ生成")):
         with st.spinner(f"「{query}」のログを検索中..."):
             logs = fetch_logs(query, "person")
         if logs:
@@ -326,11 +411,17 @@ elif mode == "② 対人攻略モード":
             st.markdown(st.session_state.karte)
         show_chat_ui(st.session_state.logs_persona)
 
+# ========== ③ 新規提案練習モード ==========
+
 elif mode == "③ 新規提案練習モード":
     st.caption("類似業界のログをもとに厳しい質問で練習します")
-    query = st.text_input("会社名または業界キーワードを入力", placeholder="例：タイミー、教育、人材、SaaS")
 
-    if query and st.button("ログを検索して練習開始"):
+    pre_query = st.session_state.pop("pre_query", "") if st.session_state.get("trigger_mode3") else ""
+    trigger = st.session_state.pop("trigger_mode3", False)
+
+    query = st.text_input("業界キーワードを入力", value=pre_query, placeholder="例：教育、人材、SaaS、製造")
+
+    if (trigger and query) or (query and st.button("ログを検索して練習開始")):
         with st.spinner(f"「{query}」業界のログを検索中..."):
             logs = fetch_logs(query, "industry")
         if logs:
