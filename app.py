@@ -137,7 +137,7 @@ def extract_persons_from_company(company_query):
 
 def call_gemini(prompt):
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-2.0-flash",
         contents=prompt,
     )
     return response.text
@@ -175,6 +175,44 @@ def build_persona_from_logs(logs, query, mode):
 
 ## この業界特有の注意点
 -
+"""
+    return call_gemini(prompt)
+
+def generate_feedback(history, karte):
+    transcript = ""
+    for msg in history:
+        if msg["role"] == "user":
+            transcript += f"【営業】{msg['content']}\n"
+        elif msg["role"] == "assistant":
+            transcript += f"【顧客】{msg['content']}\n"
+
+    prompt = f"""以下は営業ロープレの会話記録です。営業担当者のパフォーマンスを評価してください。
+
+## 顧客カルテ（顧客設定）
+{karte}
+
+## ロープレ会話
+{transcript}
+
+## フィードバック（必ずこの形式で）
+
+### ✅ 良かった点
+1.
+2.
+3.
+
+### ⚠️ 改善点
+1.
+2.
+3.
+
+### 💡 次回への具体的なアドバイス
+-
+-
+-
+
+### 総合評価：○○点／100点
+理由：
 """
     return call_gemini(prompt)
 
@@ -261,7 +299,7 @@ def get_bot_reply(user_text, persona, history):
         contents.append({"role": role, "parts": [{"text": msg["content"]}]})
     contents.append({"role": "user", "parts": [{"text": user_text}]})
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-2.0-flash",
         contents=contents,
         config=types.GenerateContentConfig(
             system_instruction=persona,
@@ -408,6 +446,20 @@ elif mode == "② 対人攻略モード":
         with st.expander("📋 人物カルテを見る"):
             st.markdown(st.session_state.karte)
         show_chat_ui(st.session_state.logs_persona)
+
+        if len(st.session_state.get("history", [])) > 2:
+            st.markdown("---")
+            if st.button("📝 ロープレ終了・フィードバックをもらう", use_container_width=True):
+                with st.spinner("フィードバックを生成中..."):
+                    st.session_state.feedback = generate_feedback(
+                        st.session_state.history,
+                        st.session_state.karte,
+                    )
+
+        if "feedback" in st.session_state and st.session_state.get("last_mode") == mode:
+            st.markdown("---")
+            st.markdown("## 📊 ロープレフィードバック")
+            st.markdown(st.session_state.feedback)
 
 # ========== ③ 新規提案練習モード ==========
 
