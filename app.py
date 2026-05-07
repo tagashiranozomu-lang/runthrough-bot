@@ -86,12 +86,15 @@ KEYWORD_EXPAND = {
 }
 
 def expand_keywords(query):
-    keywords = [query]
-    query_lower = query.lower()
-    for key, synonyms in KEYWORD_EXPAND.items():
-        if any(s.lower() in query_lower or query_lower in s.lower() for s in synonyms):
-            keywords.extend(synonyms)
-    return list(set(keywords))
+    keywords = set()
+    parts = query.split()
+    for part in parts:
+        keywords.add(part)
+        part_lower = part.lower()
+        for key, synonyms in KEYWORD_EXPAND.items():
+            if any(s.lower() in part_lower or part_lower in s.lower() for s in synonyms):
+                keywords.update(synonyms)
+    return list(keywords)
 
 @st.cache_data(ttl=3600)
 def load_logs_index():
