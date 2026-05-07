@@ -301,7 +301,7 @@ if mode == "① アポ設計モード":
         st.markdown("---")
         st.markdown(st.session_state.apo_sheet)
         st.markdown("---")
-        st.info("👇 この設計をもとに練習するには、左のメニューから①または②を選んでください")
+        st.info("👇 この設計をもとに練習するには、左のメニューから②または③を選んでください")
 
 elif mode == "② 対人攻略モード":
     st.caption("特定の担当者のペルソナで練習します")
