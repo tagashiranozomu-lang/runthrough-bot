@@ -178,6 +178,40 @@ def build_persona_from_logs(logs, query, mode):
 """
     return call_gemini(prompt)
 
+def build_runthrough_persona(logs, query):
+    combined = "\n\n".join([f"=== {f['filename']} ===\n{f['content'][:1500]}" for f in logs[:3]])
+    prompt = f"""以下の「{query}」業界の商談ログを分析し、この業界の典型的な顧客担当者・決裁者のペルソナを作成してください。
+
+## ログ
+{combined}
+
+## 出力形式（必ずこの形式で）
+
+### 業界顧客ペルソナ
+- **典型的な役職・立場**:
+- **コミュニケーションスタイル**:
+- **よく使う言葉・フレーズ**:
+- **主な関心事・懸念点**:
+- **意思決定の傾向**:
+- **典型的な質問・反論**:
+"""
+    persona_profile = call_gemini(prompt)
+
+    persona_instruction = f"""あなたは「{query}」業界の顧客担当者・決裁者として振る舞います。
+
+以下のペルソナに忠実に、リアルな顧客として応答してください。
+
+{persona_profile}
+
+【ルール】
+- このペルソナのコミュニケーションスタイルで話す
+- 一度に複数の質問を投げない（1つずつ深く詰める）
+- 営業の説明が不十分なら具体化を求める
+- プレゼンが終わったら「総評」として良かった点1つ・改善点3つを出す
+- 日本語で話す"""
+
+    return persona_profile, persona_instruction
+
 def generate_feedback(history, karte):
     transcript = ""
     for msg in history:
@@ -513,11 +547,11 @@ elif mode == "③ 新規ランスルーモード":
             logs = fetch_logs(query, "industry")
         if logs:
             st.success(f"{len(logs)}件のログが見つかりました")
-            with st.spinner("業界分析中..."):
-                analysis = build_persona_from_logs(logs, query, "industry")
+            with st.spinner("業界ペルソナを生成中..."):
+                analysis, persona_instruction = build_runthrough_persona(logs, query)
             st.session_state.analysis = analysis
-            st.session_state.logs_persona = PERSONA_STRICT + f"\n\n以下の業界分析をもとに、この業界特有の厳しい質問を重点的に行ってください：\n{analysis}"
-            st.session_state.history = [{"role": "assistant", "content": f"「{query}」業界の新規提案練習を始めます。では提案をどうぞ。"}]
+            st.session_state.logs_persona = persona_instruction
+            st.session_state.history = [{"role": "assistant", "content": f"「{query}」業界の顧客として練習します。では提案をどうぞ。"}]
             st.session_state.last_mode = mode
             st.session_state.pop("runthrough_score", None)
         else:
