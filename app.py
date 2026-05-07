@@ -87,6 +87,7 @@ KEYWORD_EXPAND = {
 
 def expand_keywords(query):
     keywords = set()
+    # Split query into individual words so "タイミー 田中" matches files containing either word
     parts = query.split()
     for part in parts:
         keywords.add(part)
@@ -138,8 +139,6 @@ def call_gemini(prompt):
     response = client.models.generate_content(
         model="gemini-2.0-flash",
         contents=prompt,
-        config=types.GenerateContentConfig(
-        ),
     )
     return response.text
 
@@ -247,11 +246,11 @@ def generate_apo_design(purpose, query, logs):
 
 ### ✅ 準備チェックリスト
 
-- [ ] 
-- [ ] 
-- [ ] 
-- [ ] 
-- [ ] 
+- [ ]
+- [ ]
+- [ ]
+- [ ]
+- [ ]
 """
     return call_gemini(prompt)
 
@@ -323,14 +322,12 @@ st.session_state.mode_index = MODES.index(mode)
 if mode == "① アポ設計モード":
     st.caption("アポ前の準備シートを自動生成します")
 
-    # 目的選択
     purpose_choice = st.selectbox("このアポで達成したい目的を選択", APO_PURPOSES)
     if purpose_choice == "その他（自由記述）":
         purpose = st.text_area("目的を自由記述してください", height=80)
     else:
         purpose = purpose_choice
 
-    # 会社名入力 → 担当者プルダウン
     company = st.text_input("会社名を入力", placeholder="例：タイミー、三幸学園")
 
     person_query = company
