@@ -512,5 +512,31 @@ elif mode == "③ 新規ランスルーモード":
         with st.spinner(f"「{query}」業界のログを検索中..."):
             logs = fetch_logs(query, "industry")
         if logs:
-            st.success(f"{len(logs)}件のログが見つかりま
-        
+            st.success(f"{len(logs)}件のログが見つかりました")
+            with st.spinner("業界分析中..."):
+                analysis = build_persona_from_logs(logs, query, "industry")
+            st.session_state.analysis = analysis
+            st.session_state.logs_persona = PERSONA_STRICT + f"\n\n以下の業界分析をもとに、この業界特有の厳しい質問を重点的に行ってください：\n{analysis}"
+            st.session_state.history = [{"role": "assistant", "content": f"「{query}」業界の新規提案練習を始めます。では提案をどうぞ。"}]
+            st.session_state.last_mode = mode
+            st.session_state.pop("runthrough_score", None)
+        else:
+            st.warning("該当するログが見つかりませんでした")
+
+    if "analysis" in st.session_state and st.session_state.get("last_mode") == mode:
+        with st.expander("📊 業界分析を見る"):
+            st.markdown(st.session_state.analysis)
+        show_chat_ui(st.session_state.logs_persona)
+
+        if len(st.session_state.get("history", [])) > 2:
+            st.markdown("---")
+            if st.button("🏆 ランスルー終了・採点してもらう", use_container_width=True):
+                with st.spinner("採点中..."):
+                    st.session_state.runthrough_score = generate_runthrough_score(
+                        st.session_state.history
+                    )
+
+        if "runthrough_score" in st.session_state and st.session_state.get("last_mode") == mode:
+            st.markdown("---")
+            st.markdown("## 🏆 ランスルー採点結果")
+            st.markdown(st.session_state.runthrough_score)
