@@ -277,7 +277,7 @@ if mode == "① アポ設計モード":
         height=100
     )
     query = st.text_input(
-        "担当者名、顧客名または業界キーワード",
+        "担当者名、会社名または業界キーワード",
         placeholder="例：田中様、タイミー、教育業界"
     )
 
@@ -328,7 +328,7 @@ elif mode == "② 対人攻略モード":
 
 elif mode == "③ 新規提案練習モード":
     st.caption("類似業界のログをもとに厳しい質問で練習します")
-    query = st.text_input("業界キーワードを入力", placeholder="例：教育、人材、SaaS、製造")
+    query = st.text_input("会社名または業界キーワードを入力", placeholder="例：タイミー、教育、人材、SaaS")
 
     if query and st.button("ログを検索して練習開始"):
         with st.spinner(f"「{query}」業界のログを検索中..."):
