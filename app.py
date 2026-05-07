@@ -277,8 +277,8 @@ if mode == "① アポ設計モード":
         height=100
     )
     query = st.text_input(
-        "顧客名または業界キーワード",
-        placeholder="例：タイミー、教育業界、SaaS"
+        "担当者名、顧客名または業界キーワード",
+        placeholder="例：田中様、タイミー、教育業界"
     )
 
     if purpose and query and st.button("アポ設計シートを生成"):
