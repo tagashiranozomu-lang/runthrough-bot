@@ -216,6 +216,43 @@ def generate_feedback(history, karte):
 """
     return call_gemini(prompt)
 
+def generate_runthrough_score(history):
+    transcript = ""
+    for msg in history:
+        if msg["role"] == "user":
+            transcript += f"【営業】{msg['content']}\n"
+        elif msg["role"] == "assistant":
+            transcript += f"【決裁者】{msg['content']}\n"
+
+    prompt = f"""以下は新規提案ランスルーの会話記録です。営業担当者を項目別に採点してください。
+
+## ランスルー会話
+{transcript}
+
+## 採点結果（必ずこの形式で）
+
+### 📊 項目別採点
+
+| 項目 | 点数（/20点） | コメント |
+|------|-------------|---------|
+| 課題理解（顧客の状況・痛みを正確に把握できたか） | /20 | |
+| ROI・数字説明（投資対効果を具体的に示せたか） | /20 | |
+| 競合差別化（他社と何が違うかを答えられたか） | /20 | |
+| 反論対応（厳しい突っ込みに論理で返せたか） | /20 | |
+| 端的さ（無駄なく結論から話せたか） | /20 | |
+
+### 🏆 総合得点：○○点／100点
+
+### ✅ 特に良かった点
+-
+
+### ⚠️ 最優先の改善点
+-
+
+### 💡 次回ランスルーへの一言アドバイス
+"""
+    return call_gemini(prompt)
+
 def generate_apo_design(purpose, query, logs):
     combined = "\n\n".join([f"=== {f['filename']} ===\n{f['content'][:1500]}" for f in logs[:5]])
     logs_section = combined if combined else "（関連ログなし：一般的な知識で判断）"
@@ -348,7 +385,7 @@ def show_chat_ui(persona):
 st.set_page_config(page_title="アポドリル", page_icon="⚡")
 st.title("⚡ アポドリル")
 
-MODES = ["① アポ設計モード", "② 対人攻略モード", "③ 新規提案練習モード"]
+MODES = ["① アポ設計モード", "② 対人攻略モード", "③ 新規ランスルーモード"]
 if "mode_index" not in st.session_state:
     st.session_state.mode_index = 0
 
@@ -411,7 +448,7 @@ if mode == "① アポ設計モード":
                 st.session_state.mode_index = 1
                 st.rerun()
         with col2:
-            if st.button("③ 新規提案練習モードで練習する", use_container_width=True):
+            if st.button("③ 新規ランスルーモードで練習する", use_container_width=True):
                 st.session_state.pre_query = st.session_state.apo_query
                 st.session_state.pre_purpose = st.session_state.apo_purpose
                 st.session_state.trigger_mode3 = True
@@ -461,10 +498,10 @@ elif mode == "② 対人攻略モード":
             st.markdown("## 📊 ロープレフィードバック")
             st.markdown(st.session_state.feedback)
 
-# ========== ③ 新規提案練習モード ==========
+# ========== ③ 新規ランスルーモード ==========
 
-elif mode == "③ 新規提案練習モード":
-    st.caption("類似業界のログをもとに厳しい質問で練習します")
+elif mode == "③ 新規ランスルーモード":
+    st.caption("類似業界のログをもとに厳しい決裁者と練習します")
 
     pre_query = st.session_state.pop("pre_query", "") if st.session_state.get("trigger_mode3") else ""
     trigger = st.session_state.pop("trigger_mode3", False)
@@ -475,17 +512,5 @@ elif mode == "③ 新規提案練習モード":
         with st.spinner(f"「{query}」業界のログを検索中..."):
             logs = fetch_logs(query, "industry")
         if logs:
-            st.success(f"{len(logs)}件のログが見つかりました")
-            with st.spinner("業界分析中..."):
-                analysis = build_persona_from_logs(logs, query, "industry")
-            st.session_state.analysis = analysis
-            st.session_state.logs_persona = PERSONA_STRICT + f"\n\n以下の業界分析をもとに、この業界特有の厳しい質問を重点的に行ってください：\n{analysis}"
-            st.session_state.history = [{"role": "assistant", "content": f"「{query}」業界の新規提案練習を始めます。では提案をどうぞ。"}]
-            st.session_state.last_mode = mode
-        else:
-            st.warning("該当するログが見つかりませんでした")
-
-    if "analysis" in st.session_state and st.session_state.get("last_mode") == mode:
-        with st.expander("📊 業界分析を見る"):
-            st.markdown(st.session_state.analysis)
-        show_chat_ui(st.session_state.logs_persona)
+            st.success(f"{len(logs)}件のログが見つかりま
+        
