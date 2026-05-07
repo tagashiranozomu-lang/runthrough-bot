@@ -137,7 +137,7 @@ def extract_persons_from_company(company_query):
 
 def call_gemini(prompt):
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         contents=prompt,
     )
     return response.text
@@ -299,7 +299,7 @@ def get_bot_reply(user_text, persona, history):
         contents.append({"role": role, "parts": [{"text": msg["content"]}]})
     contents.append({"role": "user", "parts": [{"text": user_text}]})
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         contents=contents,
         config=types.GenerateContentConfig(
             system_instruction=persona,
